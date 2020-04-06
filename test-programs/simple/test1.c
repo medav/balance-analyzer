@@ -20,13 +20,14 @@ int main() {
     const int C = 4;
 
     // Data is fed into the CGRA in 8-byte "words"
-    uint64_t arr1[100] = {1};
-    uint64_t arr2[100] = {2};
+    uint64_t arr1[ARR_SIZE] = {1};
+    uint64_t arr2[ARR_SIZE] = {2};
     uint64_t out = 0;
 
     SB_CONFIG();
 
-    // Push all 100 elements of arr1 and arr2 to ports A and B, respectively.
+    // Push all ARR_SIZE elements of arr1 and arr2 to ports A and B,
+    // respectively.
     SB_MEM_PORT_STREAM(arr1, WORD_SIZE, WORD_SIZE, ARR_SIZE, A);
     SB_MEM_PORT_STREAM(arr2, WORD_SIZE, WORD_SIZE, ARR_SIZE, B);
 
