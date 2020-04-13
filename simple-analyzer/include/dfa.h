@@ -376,12 +376,12 @@ public:
 
       // Propagate through all instructions in the block
       for (auto& i : Direction::getInstructions(*bb)) {
-        llvm::CallSite cs(&i);
-        if (isAnalyzableCall(cs)) {
-          analyzeCall(cs, state, context);
-        } else {
+
+        // if (isAnalyzableCall(cs)) {
+        //   analyzeCall(cs, state, context);
+        // } else {
           applyTransfer(i, state);
-        }
+        // }
 //meet.printState(llvm::outs(),state);
         results[&i] = state;
       }
