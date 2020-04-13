@@ -1,6 +1,7 @@
 
 #include <iostream>
 #include <memory>
+#include <unordered_set>
 
 #include "llvm/ADT/APSInt.h"
 #include "llvm/Analysis/ConstantFolding.h"
@@ -49,8 +50,47 @@ static llvm::Function * SB_DISCARD;
 struct PortAssignment {
     std::vector<int> port_values;
 
+    // Invariant: PortAssignments are always guaranteed to be in "normal form"
+    // (I.e. at least one value is 0).
+
+    PortAssignment(const std::vector<int>& _port_values)
+        : port_values(_port_values) {
+
+        int min = *std::min_element(port_values.begin(), port_values.end());
+        for (int& i : port_values) {
+            i -= min;
+        }
+    }
+
+    bool operator==(const PortAssignment& other) const {
+        int i;
+
+        if (port_values.size() != other.port_values.size()) {
+            return false;
+        }
+
+        for (i = 0; i < port_values.size(); i++) {
+            if (port_values[i] != other.port_values[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    std::size_t hash() const {
+        int sum = 0;
+
+        for (int i : port_values) {
+            sum += i;
+        }
+
+        return sum;
+    }
 
     bool Balanced() const {
+        // Only need to check against 0 since the only normal form balanced
+        // assignment is <0, 0, ...>
         for (int i : port_values) {
             if (i != 0) {
                 return false;
@@ -61,24 +101,35 @@ struct PortAssignment {
     }
 };
 
+namespace std {
+
+    template <>
+    struct hash<PortAssignment> {
+        std::size_t operator()(const PortAssignment& k) const {
+            using std::size_t;
+            using std::hash;
+            return k.hash();
+        }
+    };
+
+}
+
 struct AssignmentSet {
-    std::vector<PortAssignment> assignments;
+    std::unordered_set<PortAssignment> assignments;
 
     AssignmentSet() { }
 
-    AssignmentSet(std::vector<PortAssignment>&& _assignments)
+    AssignmentSet(std::unordered_set<PortAssignment>&& _assignments)
         : assignments(_assignments) { }
 
     AssignmentSet operator+(const AssignmentSet& other) const {
-        std::vector<PortAssignment> new_list;
-        new_list.reserve(this->assignments.size() + other.assignments.size());
-        new_list.insert(new_list.end(), this->assignments.begin(), this->assignments.end());
-        new_list.insert(new_list.end(), other.assignments.begin(), other.assignments.end());
-        return AssignmentSet(std::move(new_list));
-    }
+        std::unordered_set<PortAssignment> new_assignments = this->assignments;
 
-    void Simplify() {
-        // TODO: Dedupe and reduce <N, N, ...> to <0, 0, ...>
+        new_assignments.insert(
+            other.assignments.begin(),
+            other.assignments.end());
+
+        return AssignmentSet(std::move(new_assignments));
     }
 
     bool operator==(const AssignmentSet& other) const {
@@ -86,7 +137,7 @@ struct AssignmentSet {
     }
 
     bool AlwaysBalanced() const {
-        return assignments.size() == 1 && assignments.front().Balanced();
+        return assignments.size() == 1 && assignments.begin()->Balanced();
     }
 };
 
@@ -96,9 +147,7 @@ using AssignmentSetResult = analysis::DataflowResult<AssignmentSet>;
 class AssignmentSetCombine : public analysis::Meet<AssignmentSet, AssignmentSetCombine> {
 public:
     AssignmentSet meetPair(AssignmentSet &s1, AssignmentSet &s2) const {
-        AssignmentSet result = s1 + s2;
-        result.Simplify();
-        return result;
+        return s1 + s2;
     }
 };
 
