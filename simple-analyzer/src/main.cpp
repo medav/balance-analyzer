@@ -158,6 +158,13 @@ class AssignmentSetExtend
         return llvm::dyn_cast<llvm::Function>(calledValue);
     }
 
+    const llvm::APInt ExtractConstant(const llvm::Value * val) {
+        if (auto* constant = llvm::dyn_cast<llvm::ConstantInt>(val)) {
+            return constant->getValue();
+        }
+        assert(false);
+    }
+
 public:
     void operator()(llvm::Value &i, AssignmentSetState &state) {
         llvm::CallSite cs(&i);
@@ -167,7 +174,36 @@ public:
         if (func->isDeclaration()) return;
 
         if (func == SB_CONFIG) {
-            std::cout << "SB_CONFIG!" << std::endl;
+            std::cout << "SB_CONFIG("
+                << ")" << std::endl;
+        }
+        else if (func == SB_MEM_PORT_STREAM) {
+            std::cout << "SB_MEM_PORT_STREAM("
+                << "port = " << ExtractConstant(cs.getArgument(4)).getLimitedValue() << ", "
+                << "stride = " << ExtractConstant(cs.getArgument(1)).getLimitedValue() << ", "
+                << "access_size = " << ExtractConstant(cs.getArgument(2)).getLimitedValue() << ", "
+                << "nstrides = " << ExtractConstant(cs.getArgument(3)).getLimitedValue()
+                << ")" << std::endl;
+        }
+        else if (func == SB_CONSTANT) {
+            std::cout << "SB_CONSTANT("
+                << "port = " << ExtractConstant(cs.getArgument(0)).getLimitedValue() << ", "
+                << "nelems = " << ExtractConstant(cs.getArgument(2)).getLimitedValue()
+                << ")" << std::endl;
+        }
+        else if (func == SB_PORT_MEM_STREAM) {
+            std::cout << "SB_PORT_MEM_STREAM("
+                << "port = " << ExtractConstant(cs.getArgument(0)).getLimitedValue() << ", "
+                << "stride = " << ExtractConstant(cs.getArgument(1)).getLimitedValue() << ", "
+                << "access_size = " << ExtractConstant(cs.getArgument(2)).getLimitedValue() << ", "
+                << "nstrides = " << ExtractConstant(cs.getArgument(3)).getLimitedValue()
+                << ")" << std::endl;
+        }
+        else if (func == SB_DISCARD) {
+            std::cout << "SB_DISCARD("
+                << "port = " << ExtractConstant(cs.getArgument(0)).getLimitedValue() << ", "
+                << "nelems = " << ExtractConstant(cs.getArgument(1)).getLimitedValue()
+                << ")" << std::endl;
         }
     }
 };
