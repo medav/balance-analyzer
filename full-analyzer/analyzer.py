@@ -7,13 +7,13 @@ class Analyzer():
         self.nodes = self.BuildGraph(filename)
         self.entry = self.nodes[0]
         self.exit = self.FindExit()
-        self.wait = self.FindWait()
-        self.RemoveLoops()
-        self.ComputeDataflow()
+        # self.wait = self.FindWait()
+        # self.RemoveLoops()
+        # self.ComputeDataflow()
 
     def FindExit(self):
         # The exit node is the only control node with no targets
-        for n in nodes:
+        for n in self.nodes:
             if type(n) is ControlNode and len(n.targets) == 0:
                 return n
 
@@ -23,21 +23,36 @@ class Analyzer():
         # 3. Loop ellison / trip count insertion
         pass
 
+    def DumpDot(self, f):
+        print('digraph G {', file=f)
+        for n in self.nodes:
+            print('\t{} [label = "{}"];'.format(n.Name(), n.TypeName()))
+            for t in n.targets:
+                print(
+                    '\t{} -> {};'.format(n.Name(), t.Name()),
+                    file=f)
+
+        print('}', file=f)
+
     @staticmethod
     def ComputeSymbolicNumElems(num_iters, stride=None, access_size=None):
         return 1
 
     @staticmethod
     def BuildNode(line):
-        parts = filter(
+        parts = list(filter(
             lambda p: len(p) > 0,
-            map(lambda p: p.strip(), line.split(','))
+            map(lambda p: p.strip(), line.split(','))))
 
         bb_id = int(parts[0])
-        if parts[1] == 'control':
-            return ControlNode(bb_id, inst_id, parts[2:])
-
         inst_id = int(parts[1])
+
+        if parts[2] == 'control':
+            return ControlNode(
+                bb_id,
+                inst_id,
+                list(map(int, parts[3:])))
+
         if parts[2] == 'SB_CONFIG':
             return ConfigNode(bb_id, inst_id)
 
@@ -49,28 +64,30 @@ class Analyzer():
                 bb_id,
                 inst_id,
                 int(parts[3]),
-                ComputeSymbolicNumElems(parts[6], parts[4], parts[5]))
+                Analyzer.ComputeSymbolicNumElems(parts[6], parts[4], parts[5]))
 
         elif parts[2] == 'SB_CONSTANT':
             return PortNode(
                 bb_id,
                 inst_id,
                 int(parts[3]),
-                ComputeSymbolicNumElems(parts[4]))
+                Analyzer.ComputeSymbolicNumElems(parts[4]))
 
         elif parts[2] == 'SB_DISCARD':
             return PortNode(
                 bb_id,
                 inst_id,
                 int(parts[3]),
-                ComputeSymbolicNumElems(parts[4]))
+                Analyzer.ComputeSymbolicNumElems(parts[4]))
 
         elif parts[2] == 'SB_PORT_MEM_STREAM':
             return PortNode(
                 bb_id,
                 inst_id,
                 int(parts[3]),
-                ComputeSymbolicNumElems(parts[6], parts[4], parts[5]))
+                Analyzer.ComputeSymbolicNumElems(parts[6], parts[4], parts[5]))
+
+        assert False, line
 
     @staticmethod
     def BuildGraph(filename):
@@ -82,9 +99,11 @@ class Analyzer():
         # Initially just build all the nodes
         with open(filename) as f:
             for line in f:
-                n = BuildNode(line)
+                n = Analyzer.BuildNode(line)
                 num_bbs = max(n.bb_id, num_bbs)
                 nodes.append(n)
+
+        num_bbs += 1
 
         #
         # Now link the nodes by their control flow
