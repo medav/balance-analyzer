@@ -229,9 +229,7 @@ public:
         llvm::Function * func = getCalledFunction(cs);
         if (func->isDeclaration()) return;
 
-        if (func == SB_CONFIG) {
-			// need to make sure state is empty before we start??
-			
+        if (func == SB_CONFIG) {			
 			std::cout << "SB_CONFIG("
                 << ")" << std::endl;
 				
@@ -243,9 +241,9 @@ public:
 			AssignmentSet as;
 			as.assignments = pas;
 			
-			state[func] = as;
+			state[&i] = as;
 			
-			std::cout << state[func] << '\n';
+			std::cout << state[&i] << '\n';
         }
         else if (func == SB_MEM_PORT_STREAM) {
 			std::cout << "SB_MEM_PORT_STREAM("
@@ -262,12 +260,23 @@ public:
 			int access_size = ExtractConstant(cs.getArgument(2)).getLimitedValue();
 			int nstrides = ExtractConstant(cs.getArgument(3)).getLimitedValue();
 			
-			for (auto i : state) {
-				state[func] = state[func] + i.second;
-			}
 			
-			state[func].AddAtPort(port-1, nstrides * access_size / 8);
-			std::cout << state[func] << '\n';
+			// This does not work 
+			// (want to access most recently added, not guaranteed to be at end)
+			/*
+			for (auto j = state.begin(); j != state.end(); j++) {
+				if (std::next(j) == state.end()) {
+					state[&i] = state[&i] + j->second;
+				}
+			}
+			*/
+			
+			for (auto j : state) {
+				state[&i] = state[&i] + j.second;
+			}			
+			
+			state[&i].AddAtPort(port-1, nstrides * access_size / 8);
+			std::cout << state[&i] << '\n';
         }
         else if (func == SB_CONSTANT) {
 			std::cout << "SB_CONSTANT("
@@ -278,12 +287,13 @@ public:
 			int port = ExtractConstant(cs.getArgument(0)).getLimitedValue();
 			int nelems = ExtractConstant(cs.getArgument(2)).getLimitedValue();
 			
-			for (auto i : state) {
-				state[func] = state[func] + i.second;
+			
+			for (auto j : state) {
+				state[&i] = state[&i] + j.second;
 			}
 			
-			state[func].AddAtPort(port-1, nelems);
-			std::cout << state[func] << '\n';
+			state[&i].AddAtPort(port-1, nelems);
+			std::cout << state[&i] << '\n';
         }
         else if (func == SB_PORT_MEM_STREAM) {
 			std::cout << "SB_PORT_MEM_STREAM("
@@ -300,12 +310,12 @@ public:
 			int access_size = ExtractConstant(cs.getArgument(2)).getLimitedValue();
 			int nstrides = ExtractConstant(cs.getArgument(3)).getLimitedValue();
 			
-			for (auto i : state) {
-				state[func] = state[func] + i.second;
+			for (auto j : state) {
+				state[&i] = state[&i] + j.second;
 			}
 			
-			state[func].AddAtPort(port-1, nstrides * access_size / 8);
-			std::cout << state[func] << '\n';
+			state[&i].AddAtPort(port-1, nstrides * access_size / 8);
+			std::cout << state[&i] << '\n';
         }
         else if (func == SB_DISCARD) {
 			std::cout << "SB_DISCARD("
@@ -316,12 +326,13 @@ public:
 			int port = ExtractConstant(cs.getArgument(0)).getLimitedValue();
 			int nelems = ExtractConstant(cs.getArgument(1)).getLimitedValue();
 			
-			for (auto i : state) {
-				state[func] = state[func] + i.second;
+			for (auto j : state) {
+				state[&i] = state[&i] + j.second;
 			}
 			
-			state[func].AddAtPort(port-1, nelems);
-			std::cout << state[func] << '\n';	
+			
+			state[&i].AddAtPort(port-1, nelems);
+			std::cout << state[&i] << '\n';	
         }
 		/*
 		else if (func == SB_WAIT) {
