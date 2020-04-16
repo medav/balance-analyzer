@@ -84,39 +84,39 @@ void ProcessCall(int bb_id, int inst_id, llvm::CallSite& cs) {
     }
     else if (func == SB_MEM_PORT_STREAM) {
         out_file << bb_id << "," << inst_id << ","
-            << "SB_MEM_PORT_STREAM("
-            /* << "port = " */ << ExtractConstant(cs.getArgument(4)) << ", "
-            /* << "stride = " */ << ExtractConstant(cs.getArgument(1)) << ", "
-            /* << "access_size = " */ << ExtractConstant(cs.getArgument(2)) << ", "
+            << "SB_MEM_PORT_STREAM,"
+            /* << "port = " */ << ExtractConstant(cs.getArgument(4)) << ","
+            /* << "stride = " */ << ExtractConstant(cs.getArgument(1)) << ","
+            /* << "access_size = " */ << ExtractConstant(cs.getArgument(2)) << ","
             /* << "nstrides = " */ << ExtractConstant(cs.getArgument(3))
-            << ")" << std::endl;
+            << std::endl;
     }
     else if (func == SB_CONSTANT) {
         out_file << bb_id << "," << inst_id << ","
-            << "SB_CONSTANT("
-            /* << "port = " */ << ExtractConstant(cs.getArgument(0)) << ", "
+            << "SB_CONSTANT,"
+            /* << "port = " */ << ExtractConstant(cs.getArgument(0)) << ","
             /* << "nelems = " */ << ExtractConstant(cs.getArgument(2))
-            << ")" << std::endl;
+            << std::endl;
     }
     else if (func == SB_PORT_MEM_STREAM) {
         out_file << bb_id << "," << inst_id << ","
-            << "SB_PORT_MEM_STREAM("
-            /* << "port = " */ << ExtractConstant(cs.getArgument(0)) << ", "
-            /* << "stride = " */ << ExtractConstant(cs.getArgument(1)) << ", "
-            /* << "access_size = " */ << ExtractConstant(cs.getArgument(2)) << ", "
+            << "SB_PORT_MEM_STREAM,"
+            /* << "port = " */ << ExtractConstant(cs.getArgument(0)) << ","
+            /* << "stride = " */ << ExtractConstant(cs.getArgument(1)) << ","
+            /* << "access_size = " */ << ExtractConstant(cs.getArgument(2)) << ","
             /* << "nstrides = " */ << ExtractConstant(cs.getArgument(3))
-            << ")" << std::endl;
+            << std::endl;
     }
     else if (func == SB_DISCARD) {
         out_file << bb_id << "," << inst_id << ","
-            << "SB_DISCARD("
-            /* << "port = " */ << ExtractConstant(cs.getArgument(0)) << ", "
+            << "SB_DISCARD,"
+            /* << "port = " */ << ExtractConstant(cs.getArgument(0)) << ","
             /* << "nelems = " */ << ExtractConstant(cs.getArgument(1))
-            << ")" << std::endl;
+            << std::endl;
     }
     else if (func == SB_WAIT) {
         out_file << bb_id << "," << inst_id << ","
-            << "SB_WAIT()" << std::endl;
+            << "SB_WAIT" << std::endl;
     }
 }
 
@@ -144,7 +144,7 @@ void ProcessBasicBlock(BbIdMap& bb_id_map, auto * bb) {
         num_successors++;
     }
 
-    out_file << bb_id << ",control,";
+    out_file << bb_id << "," << inst_id << ",control,";
     for (auto* s : Forward::getSuccessors(*bb)) {
         out_file << bb_id_map[s] << ",";
     }
