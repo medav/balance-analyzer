@@ -99,7 +99,35 @@ struct PortAssignment {
 
         return true;
     }
+	
+	const PortAssignment AddAtPort(int portNum, int value) {		
+		std::vector<int> copy = port_values;
+		copy[portNum] += value; 
+				
+		return PortAssignment(copy);
+	}
+	
+	bool isBalanced() {
+		return (*std::max_element(port_values.begin(), port_values.end()) == 0);
+	}
 };
+
+std::ostream& operator<<(std::ostream& os, const PortAssignment& p) {
+	os << '<';
+	
+	int c = 0;
+	for (auto i = p.port_values.begin(); i != p.port_values.end(); i++) {
+		
+		if (c > 0) {
+			os << ", ";
+		}
+		os << (*i);
+		c++;
+	}
+	os << '>';
+	
+	return os;
+}
 
 namespace std {
 
@@ -139,7 +167,35 @@ struct AssignmentSet {
     bool AlwaysBalanced() const {
         return assignments.size() == 1 && assignments.begin()->Balanced();
     }
+	
+	void AddAtPort(int portNum, int value) {
+		std::unordered_set<PortAssignment> updated;
+		for (auto i : assignments) {
+			PortAssignment p = i.AddAtPort(portNum, value);
+			updated.insert(p);
+		}
+		assignments = updated;
+	}
+	
+	bool isBalanced() {
+		for (auto a : assignments) {
+			if (a.isBalanced()) {
+				return true;
+			}
+		}
+		return false;
+	}
 };
+
+
+std::ostream& operator<<(std::ostream& os, const AssignmentSet& a) {	
+	for (auto i = a.assignments.begin(); i != a.assignments.end(); i++) {
+		os << (*i) << '\n';
+	}
+	
+	return os;
+}
+
 
 using AssignmentSetState = analysis::AbstractState<AssignmentSet>;
 using AssignmentSetResult = analysis::DataflowResult<AssignmentSet>;
@@ -167,46 +223,148 @@ class AssignmentSetExtend
 
 public:
     void operator()(llvm::Value &i, AssignmentSetState &state) {
-        llvm::CallSite cs(&i);
+		llvm::CallSite cs(&i);
         if (!cs.getInstruction()) return;
 
         llvm::Function * func = getCalledFunction(cs);
         if (func->isDeclaration()) return;
 
         if (func == SB_CONFIG) {
-            std::cout << "SB_CONFIG("
+			// need to make sure state is empty before we start??
+			
+			std::cout << "SB_CONFIG("
                 << ")" << std::endl;
+				
+			PortAssignment bottom(std::vector<int> (num_ports,0));
+			
+			std::unordered_set<PortAssignment> pas;
+			pas.insert(bottom);
+			
+			AssignmentSet as;
+			as.assignments = pas;
+			
+			state[func] = as;
+			
+			std::cout << state[func] << '\n';
         }
         else if (func == SB_MEM_PORT_STREAM) {
-            std::cout << "SB_MEM_PORT_STREAM("
+			std::cout << "SB_MEM_PORT_STREAM("
                 << "port = " << ExtractConstant(cs.getArgument(4)).getLimitedValue() << ", "
                 << "stride = " << ExtractConstant(cs.getArgument(1)).getLimitedValue() << ", "
                 << "access_size = " << ExtractConstant(cs.getArgument(2)).getLimitedValue() << ", "
                 << "nstrides = " << ExtractConstant(cs.getArgument(3)).getLimitedValue()
                 << ")" << std::endl;
+				
+			// number of elements = nstrides * access_size / 8
+			// ports are numbered starting at 1
+			
+			int port = ExtractConstant(cs.getArgument(4)).getLimitedValue();
+			int access_size = ExtractConstant(cs.getArgument(2)).getLimitedValue();
+			int nstrides = ExtractConstant(cs.getArgument(3)).getLimitedValue();
+			
+			for (auto i : state) {
+				state[func] = state[func] + i.second;
+			}
+			
+			state[func].AddAtPort(port-1, nstrides * access_size / 8);
+			std::cout << state[func] << '\n';
         }
         else if (func == SB_CONSTANT) {
-            std::cout << "SB_CONSTANT("
+			std::cout << "SB_CONSTANT("
                 << "port = " << ExtractConstant(cs.getArgument(0)).getLimitedValue() << ", "
                 << "nelems = " << ExtractConstant(cs.getArgument(2)).getLimitedValue()
                 << ")" << std::endl;
+				
+			int port = ExtractConstant(cs.getArgument(0)).getLimitedValue();
+			int nelems = ExtractConstant(cs.getArgument(2)).getLimitedValue();
+			
+			for (auto i : state) {
+				state[func] = state[func] + i.second;
+			}
+			
+			state[func].AddAtPort(port-1, nelems);
+			std::cout << state[func] << '\n';
         }
         else if (func == SB_PORT_MEM_STREAM) {
-            std::cout << "SB_PORT_MEM_STREAM("
+			std::cout << "SB_PORT_MEM_STREAM("
                 << "port = " << ExtractConstant(cs.getArgument(0)).getLimitedValue() << ", "
                 << "stride = " << ExtractConstant(cs.getArgument(1)).getLimitedValue() << ", "
                 << "access_size = " << ExtractConstant(cs.getArgument(2)).getLimitedValue() << ", "
                 << "nstrides = " << ExtractConstant(cs.getArgument(3)).getLimitedValue()
                 << ")" << std::endl;
+				
+			// number of elements = nstrides * access_size / 8
+			// ports are numbered starting at 1
+			
+			int port = ExtractConstant(cs.getArgument(0)).getLimitedValue();
+			int access_size = ExtractConstant(cs.getArgument(2)).getLimitedValue();
+			int nstrides = ExtractConstant(cs.getArgument(3)).getLimitedValue();
+			
+			for (auto i : state) {
+				state[func] = state[func] + i.second;
+			}
+			
+			state[func].AddAtPort(port-1, nstrides * access_size / 8);
+			std::cout << state[func] << '\n';
         }
         else if (func == SB_DISCARD) {
-            std::cout << "SB_DISCARD("
+			std::cout << "SB_DISCARD("
                 << "port = " << ExtractConstant(cs.getArgument(0)).getLimitedValue() << ", "
                 << "nelems = " << ExtractConstant(cs.getArgument(1)).getLimitedValue()
                 << ")" << std::endl;
+				
+			int port = ExtractConstant(cs.getArgument(0)).getLimitedValue();
+			int nelems = ExtractConstant(cs.getArgument(1)).getLimitedValue();
+			
+			for (auto i : state) {
+				state[func] = state[func] + i.second;
+			}
+			
+			state[func].AddAtPort(port-1, nelems);
+			std::cout << state[func] << '\n';	
         }
+		/*
+		else if (func == SB_WAIT) {
+			for (auto i : state) {
+				state[func] = state[func] + i.second;
+			}
+		}
+		*/
     }
 };
+
+static void
+printWaitBalance(AssignmentSetResult& functionResults) {
+	for (auto& [value,localState] : functionResults) {
+		auto* inst = llvm::dyn_cast<llvm::Instruction>(value);
+		if (!inst) {
+		  continue;
+		}
+
+		llvm::CallSite cs{inst};
+		if (!cs.getInstruction()) {
+		  continue;
+		}
+			
+		std::string fnName = "";
+		
+		//identify somehow what function is being called here?
+		
+		if (fnName == "SB_WAIT") {
+			auto& state = analysis::getIncomingState(functionResults, *inst);
+			
+			bool hasBalancedOption = std::any_of(cs.arg_begin(), cs.arg_end(),
+				[&state] (auto& use) { return state[use.get()].isBalanced(); });
+			if (!hasBalancedOption) {
+				continue;
+			}
+			else {
+				llvm::outs() << "SB_WAIT is possibly balanced.";
+				llvm::outs() << "\n\n";
+			}
+		}
+	}
+}
 
 int main(int argc, char **argv) {
 
@@ -247,11 +405,24 @@ int main(int argc, char **argv) {
     using Analysis = analysis::DataflowAnalysis<Value, Transfer, Meet>;
     Analysis analysis{*module, main_func};
     auto results = analysis.computeDataflow();
-    // for (auto& [context, contextResults] : results) {
-    //     for (auto& [function, functionResults] : contextResults) {
-    //         printConstantArguments(functionResults);
-    //     }
-    // }
+	
+    for (auto& [context, contextResults] : results) {
+        for (auto& [function, functionResults] : contextResults) {
+			
+			printWaitBalance(functionResults);
+			
+            /*
+			if (function == SB_WAIT) {
+				std::cout << "function wait\n";
+			}
+			*/
+			/*
+			if (functionResults == SB_WAIT) {
+				std::cout << "functionResults wait\n";
+			}
+			*/
+        }
+    }
 
     return 0;
 }
