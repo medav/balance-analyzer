@@ -6,6 +6,7 @@ class DataflowNode:
         self.inst_id = inst_id
         self.trip_count = trip_count
         self.targets = []
+        self.num_sources = 0
 
     def Name(self):
         return 'bb{}_i{}'.format(self.bb_id, self.inst_id)

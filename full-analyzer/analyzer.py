@@ -123,6 +123,7 @@ class Analyzer():
                 n1 = bb[i]
                 n2 = bb[i + 1]
                 n1.targets.append(n2)
+                n2.num_source += 1
 
         # Now link basic blocks by their control nodes
         for bb_id in range(num_bbs):
