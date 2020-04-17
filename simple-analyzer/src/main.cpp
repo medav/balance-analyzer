@@ -244,6 +244,8 @@ public:
 			state[&i] = as;
 			
 			std::cout << state[&i] << '\n';
+			
+			state[nullptr] = as;
         }
         else if (func == SB_MEM_PORT_STREAM) {
 			std::cout << "SB_MEM_PORT_STREAM("
@@ -271,12 +273,16 @@ public:
 			}
 			*/
 			
+			state[&i] = state[nullptr];
+			/*
 			for (auto j : state) {
 				state[&i] = state[&i] + j.second;
-			}			
+			}
+			*/			
 			
 			state[&i].AddAtPort(port-1, nstrides * access_size / 8);
 			std::cout << state[&i] << '\n';
+			state[nullptr] = state[&i];
         }
         else if (func == SB_CONSTANT) {
 			std::cout << "SB_CONSTANT("
@@ -287,13 +293,11 @@ public:
 			int port = ExtractConstant(cs.getArgument(0)).getLimitedValue();
 			int nelems = ExtractConstant(cs.getArgument(2)).getLimitedValue();
 			
-			
-			for (auto j : state) {
-				state[&i] = state[&i] + j.second;
-			}
+			state[&i] = state[nullptr];
 			
 			state[&i].AddAtPort(port-1, nelems);
 			std::cout << state[&i] << '\n';
+			state[nullptr] = state[&i];
         }
         else if (func == SB_PORT_MEM_STREAM) {
 			std::cout << "SB_PORT_MEM_STREAM("
@@ -310,12 +314,11 @@ public:
 			int access_size = ExtractConstant(cs.getArgument(2)).getLimitedValue();
 			int nstrides = ExtractConstant(cs.getArgument(3)).getLimitedValue();
 			
-			for (auto j : state) {
-				state[&i] = state[&i] + j.second;
-			}
+			state[&i] = state[nullptr];
 			
 			state[&i].AddAtPort(port-1, nstrides * access_size / 8);
 			std::cout << state[&i] << '\n';
+			state[nullptr] = state[&i];
         }
         else if (func == SB_DISCARD) {
 			std::cout << "SB_DISCARD("
@@ -326,13 +329,12 @@ public:
 			int port = ExtractConstant(cs.getArgument(0)).getLimitedValue();
 			int nelems = ExtractConstant(cs.getArgument(1)).getLimitedValue();
 			
-			for (auto j : state) {
-				state[&i] = state[&i] + j.second;
-			}
+			state[&i] = state[nullptr];
 			
 			
 			state[&i].AddAtPort(port-1, nelems);
 			std::cout << state[&i] << '\n';	
+			state[nullptr] = state[&i];
         }
 		/*
 		else if (func == SB_WAIT) {
