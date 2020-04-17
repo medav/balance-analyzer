@@ -95,9 +95,9 @@ class ControlNode(DataflowNode):
         # A loop entry will be a control node with 2 sources and 2 targets.
         # In addition, one of the targets must be able to reach this node.
         return \
-            self.num_sources == 2 and
-            len(self.targets) == 2 and
-            (self.targets[0].IsReachable(self) or
+            self.num_sources == 2 and \
+            len(self.targets) == 2 and \
+            (self.targets[0].IsReachable(self) or \
                 self.targets[1].IsReachable(self))
 
     def GetLoopBody(self):

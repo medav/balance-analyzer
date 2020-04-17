@@ -20,7 +20,7 @@ class Analyzer():
             if type(n) is ControlNode and len(n.targets) == 0:
                 return n
 
-    def PostProcess(self, entry, stop_before):
+    def PostProcess(self, entry=None, stop_before=None):
         """ Post Process the CFG
 
         This is operates recursively, almost like a post-order tree traversal.
@@ -29,29 +29,35 @@ class Analyzer():
         (potentially with conditional branches which reconverge).
         """
 
+        if entry is None:
+            entry = self.entry
+
+        if stop_before is None:
+            stop_before = self.exit
+
         if entry == stop_before:
             return
 
-        if type(n) is ControlNode and n.IsLoopEntry():
-            tc = Int('loop_{}'.format(n.Name()))
-            self.loop_trip_counts[n] = tc
-            loop_body = n.GetLoopBody()
+        if type(entry) is ControlNode and entry.IsLoopEntry():
+            tc = Int('loop_{}'.format(entry.Name()))
+            self.loop_trip_counts[entry] = tc
+            loop_body = entry.GetLoopBody()
             self.PostProcess(loop_body)
-            self.ApplyTripCount(loop_body, tc, n)
+            self.ApplyTripCount(loop_body, tc, entry)
 
-        elif type(n) is ControlNode and n.IsConditional():
-            tc = Int('cond_{}'.format(n.Name()))
-            self.cond_trip_counts[n] = tc
-            cond_exit = n.GetCondExit()
-            true_branch = n.GetTrueBranch()
-            false_branch = n.GetFalseBranch()
+        elif type(entry) is ControlNode and entry.IsConditional():
+            tc = Int('cond_{}'.format(entry.Name()))
+            self.cond_trip_counts[entry] = tc
+            cond_exit = entry.GetCondExit()
+            true_branch = entry.GetTrueBranch()
+            false_branch = entry.GetFalseBranch()
             self.PostProcess(true_branch, cond_exit)
             self.PostProcess(false_branch, cond_exit)
             self.ApplyTripCount(true_branch, tc, cond_exit)
             self.ApplyTripCount(false_branch, tc, cond_exit)
 
         else:
-            assert len(entry.targets) == 1
+            assert len(entry.targets) == 1, 'Not a conditional or loop?'
             self.PostProcess(entry.targets[0], stop_before)
 
     def DumpDot(self, f):
@@ -154,7 +160,7 @@ class Analyzer():
                 n1 = bb[i]
                 n2 = bb[i + 1]
                 n1.targets.append(n2)
-                n2.num_source += 1
+                n2.num_sources += 1
 
         # Now link basic blocks by their control nodes
         for bb_id in range(num_bbs):
