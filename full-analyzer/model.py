@@ -9,7 +9,21 @@ class DataflowNode:
         self.num_sources = 0
 
     def IsReachable(self, target):
-        raise NotImplementedError()
+        seen = set()
+        work_list = [self]
+
+        while len(work_list) > 0:
+            n = work_list.pop(0)
+            seen.add(n)
+
+            if n is target:
+                 return True
+
+            for t in n.targets:
+                if t not in seen:
+                    work_list.add(t)
+
+        return False
 
     def Name(self):
         return 'bb{}_i{}'.format(self.bb_id, self.inst_id)
