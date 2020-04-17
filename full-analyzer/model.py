@@ -6,7 +6,7 @@ class DataflowNode:
         self.inst_id = inst_id
         self.trip_count = trip_count
         self.targets = []
-        self.num_sources = 0
+        self.sources = []
 
     def IsReachable(self, target):
         seen = set()
@@ -21,12 +21,15 @@ class DataflowNode:
 
             for t in n.targets:
                 if t not in seen:
-                    work_list.add(t)
+                    work_list.append(t)
 
         return False
 
     def Name(self):
         return 'bb{}_i{}'.format(self.bb_id, self.inst_id)
+
+    def __repr__(self):
+        return self.Name()
 
 class PortNode(DataflowNode):
     def __init__(self, bb_id, inst_id, port, num_elem):
@@ -60,7 +63,7 @@ class ControlNode(DataflowNode):
         # A conditional is identified by any control node with 1 source and two
         # targets. This should theoretically suffice for capturing any if
         # expression in C
-        return self.num_sources == 1 and len(self.targets) == 2
+        return len(self.sources) == 1 and len(self.targets) == 2
 
     def GetCondExit(self):
         assert self.IsConditional()
@@ -95,7 +98,7 @@ class ControlNode(DataflowNode):
         # A loop entry will be a control node with 2 sources and 2 targets.
         # In addition, one of the targets must be able to reach this node.
         return \
-            self.num_sources == 2 and \
+            len(self.sources) == 2 and \
             len(self.targets) == 2 and \
             (self.targets[0].IsReachable(self) or \
                 self.targets[1].IsReachable(self))
@@ -106,6 +109,21 @@ class ControlNode(DataflowNode):
             return self.targets[0]
         else:
             return self.targets[1]
+
+    def GetLoopExit(self):
+        assert self.IsLoopEntry()
+        if self.targets[0].IsReachable(self):
+            return self.targets[1]
+        else:
+            return self.targets[0]
+
+    def GetLoopReentry(self):
+        assert self.IsLoopEntry()
+        body = self.GetLoopBody()
+        if body.IsReachable(self.sources[0]):
+            return self.sources[0]
+        else:
+            return self.sources[1]
 
     def TypeName(self):
         return 'Ctrl'

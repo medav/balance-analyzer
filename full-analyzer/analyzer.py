@@ -1,4 +1,6 @@
 
+from z3 import *
+
 from model import *
 
 class Analyzer():
@@ -20,6 +22,9 @@ class Analyzer():
             if type(n) is ControlNode and len(n.targets) == 0:
                 return n
 
+    def ApplyTripCount(self, entry, tc, stop_before):
+        pass
+
     def PostProcess(self, entry=None, stop_before=None):
         """ Post Process the CFG
 
@@ -39,13 +44,28 @@ class Analyzer():
             return
 
         if type(entry) is ControlNode and entry.IsLoopEntry():
+            print('Loop found at {}'.format(entry.Name()))
             tc = Int('loop_{}'.format(entry.Name()))
             self.loop_trip_counts[entry] = tc
+
             loop_body = entry.GetLoopBody()
-            self.PostProcess(loop_body)
+            loop_exit = entry.GetLoopExit()
+            reentry = entry.GetLoopReentry()
+
+            # Before anything else, we post process the loop body. This is the
+            # "pre-order" part of this traversal.
+            self.PostProcess(loop_body, entry)
             self.ApplyTripCount(loop_body, tc, entry)
 
+            # Now Post Process the rest of the graph starting at the loop exit.
+            self.PostProcess(loop_exit, stop_before)
+
+            # Finally, unlink the loop.
+            reentry.targets = [entry.GetLoopExit()]
+            entry.targets = [loop_body]
+
         elif type(entry) is ControlNode and entry.IsConditional():
+            print('Conditional found at {}'.format(entry.Name()))
             tc = Int('cond_{}'.format(entry.Name()))
             self.cond_trip_counts[entry] = tc
             cond_exit = entry.GetCondExit()
@@ -55,9 +75,16 @@ class Analyzer():
             self.PostProcess(false_branch, cond_exit)
             self.ApplyTripCount(true_branch, tc, cond_exit)
             self.ApplyTripCount(false_branch, tc, cond_exit)
+            self.PostProcess(cond_exit, stop_before)
 
         else:
-            assert len(entry.targets) == 1, 'Not a conditional or loop?'
+            #assert len(entry.targets) == 1, 'Not a conditional or loop?'
+            if len(entry.targets) != 1:
+                print('Error! Expecting a conditional or loop!')
+                print('name = ', entry.Name())
+                print('sources = ', entry.sources)
+                print('targets = ', entry.targets)
+                raise RuntimeError('Not a conditional or loop?')
             self.PostProcess(entry.targets[0], stop_before)
 
     def DumpDot(self, f):
@@ -160,13 +187,14 @@ class Analyzer():
                 n1 = bb[i]
                 n2 = bb[i + 1]
                 n1.targets.append(n2)
-                n2.num_sources += 1
+                n2.sources.append(n1)
 
         # Now link basic blocks by their control nodes
         for bb_id in range(num_bbs):
             cn = exit_points[bb_id]
             for target_id in cn.target_bbs:
                 cn.targets.append(entry_points[target_id])
+                entry_points[target_id].sources.append(cn)
 
         return nodes
 
