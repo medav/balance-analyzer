@@ -78,7 +78,8 @@ class ControlNode(DataflowNode):
                 return n
 
             for t in n.targets:
-                work_list.append(t)
+                if n not in seen:
+                    work_list.append(t)
 
         raise RuntimeError('Could not find If-Condition Exit!')
 
