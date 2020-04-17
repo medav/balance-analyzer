@@ -50,7 +50,23 @@ class ControlNode(DataflowNode):
 
     def GetCondExit(self):
         assert self.IsConditional()
-        raise NotImplementedError()
+
+        tb = self.GetTrueBranch()
+        fb = self.GetFalseBranch()
+
+        seen = set()
+        work_list = [tb, fb]
+
+        while len(work_list) > 0:
+            n = work_list.pop(0)
+
+            if n in seen:
+                return n
+
+            for t in n.targets:
+                work_list.append(t)
+
+        raise RuntimeError('Could not find If-Condition Exit!')
 
     def GetTrueBranch(self):
         assert self.IsConditional()
