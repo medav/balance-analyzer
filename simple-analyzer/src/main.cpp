@@ -179,11 +179,20 @@ struct AssignmentSet {
 	
 	bool isBalanced() {
 		for (auto a : assignments) {
+			if (!a.isBalanced()) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	bool hasBalanced() {
+		for (auto a : assignments) {
 			if (a.isBalanced()) {
 				return true;
 			}
 		}
-		return false;
+		return false;		
 	}
 };
 
@@ -262,27 +271,8 @@ public:
 			int access_size = ExtractConstant(cs.getArgument(2)).getLimitedValue();
 			int nstrides = ExtractConstant(cs.getArgument(3)).getLimitedValue();
 			
-			
-			// This does not work 
-			// (want to access most recently added, not guaranteed to be at end)
-			/*
-			for (auto j = state.begin(); j != state.end(); j++) {
-				if (std::next(j) == state.end()) {
-					state[&i] = state[&i] + j->second;
-				}
-			}
-			*/
-			
-			state[&i] = state[nullptr];
-			/*
-			for (auto j : state) {
-				state[&i] = state[&i] + j.second;
-			}
-			*/			
-			
-			state[&i].AddAtPort(port-1, nstrides * access_size / 8);
-			std::cout << state[&i] << '\n';
-			state[nullptr] = state[&i];
+			state[nullptr].AddAtPort(port-1, nstrides * access_size / 8);
+			std::cout << state[nullptr] << '\n';
         }
         else if (func == SB_CONSTANT) {
 			std::cout << "SB_CONSTANT("
@@ -293,11 +283,9 @@ public:
 			int port = ExtractConstant(cs.getArgument(0)).getLimitedValue();
 			int nelems = ExtractConstant(cs.getArgument(2)).getLimitedValue();
 			
-			state[&i] = state[nullptr];
 			
-			state[&i].AddAtPort(port-1, nelems);
-			std::cout << state[&i] << '\n';
-			state[nullptr] = state[&i];
+			state[nullptr].AddAtPort(port-1, nelems);
+			std::cout << state[nullptr] << '\n';
         }
         else if (func == SB_PORT_MEM_STREAM) {
 			std::cout << "SB_PORT_MEM_STREAM("
@@ -314,11 +302,8 @@ public:
 			int access_size = ExtractConstant(cs.getArgument(2)).getLimitedValue();
 			int nstrides = ExtractConstant(cs.getArgument(3)).getLimitedValue();
 			
-			state[&i] = state[nullptr];
-			
-			state[&i].AddAtPort(port-1, nstrides * access_size / 8);
-			std::cout << state[&i] << '\n';
-			state[nullptr] = state[&i];
+			state[nullptr].AddAtPort(port-1, nstrides * access_size / 8);
+			std::cout << state[nullptr] << '\n';
         }
         else if (func == SB_DISCARD) {
 			std::cout << "SB_DISCARD("
@@ -329,22 +314,21 @@ public:
 			int port = ExtractConstant(cs.getArgument(0)).getLimitedValue();
 			int nelems = ExtractConstant(cs.getArgument(1)).getLimitedValue();
 			
-			state[&i] = state[nullptr];
-			
-			
-			state[&i].AddAtPort(port-1, nelems);
-			std::cout << state[&i] << '\n';	
-			state[nullptr] = state[&i];
+			state[nullptr].AddAtPort(port-1, nelems);
+			std::cout << state[nullptr] << '\n';
         }
-		/*
-		else if (func == SB_WAIT) {
-			for (auto i : state) {
-				state[func] = state[func] + i.second;
-			}
-		}
-		*/
     }
 };
+
+static const llvm::Function *
+getCalledFunction(const llvm::CallSite cs) {
+	if (!cs.getInstruction()) {
+		return nullptr;
+	}
+
+	const llvm::Value *called = cs.getCalledValue()->stripPointerCasts();
+	return llvm::dyn_cast<llvm::Function>(called);
+}
 
 static void
 printWaitBalance(AssignmentSetResult& functionResults) {
@@ -353,27 +337,28 @@ printWaitBalance(AssignmentSetResult& functionResults) {
 		if (!inst) {
 		  continue;
 		}
-
-		llvm::CallSite cs{inst};
-		if (!cs.getInstruction()) {
-		  continue;
-		}
-			
-		std::string fnName = "";
 		
-		//identify somehow what function is being called here?
+		auto* called = getCalledFunction(llvm::CallSite{inst});
+		
+		if (called == nullptr) {
+			continue;
+		}
+		
+		auto fnName = called->getName();
 		
 		if (fnName == "SB_WAIT") {
-			auto& state = analysis::getIncomingState(functionResults, *inst);
-			
-			bool hasBalancedOption = std::any_of(cs.arg_begin(), cs.arg_end(),
-				[&state] (auto& use) { return state[use.get()].isBalanced(); });
-			if (!hasBalancedOption) {
-				continue;
+			llvm::outs() << fnName << '\n';	
+			if (localState[nullptr].isBalanced()) {
+				llvm::outs().changeColor(raw_ostream::Colors::GREEN);
+				std::cout << "Balanced\n\n";
+			}
+			else if (localState[nullptr].hasBalanced()) {
+				llvm::outs().changeColor(raw_ostream::Colors::YELLOW);
+				std::cout << "Maybe balanced\n\n";
 			}
 			else {
-				llvm::outs() << "SB_WAIT is possibly balanced.";
-				llvm::outs() << "\n\n";
+				llvm::outs().changeColor(raw_ostream::Colors::RED);
+				std::cout << "Not balanced\n\n";
 			}
 		}
 	}
@@ -421,19 +406,7 @@ int main(int argc, char **argv) {
 	
     for (auto& [context, contextResults] : results) {
         for (auto& [function, functionResults] : contextResults) {
-			
 			printWaitBalance(functionResults);
-			
-            /*
-			if (function == SB_WAIT) {
-				std::cout << "function wait\n";
-			}
-			*/
-			/*
-			if (functionResults == SB_WAIT) {
-				std::cout << "functionResults wait\n";
-			}
-			*/
         }
     }
 
