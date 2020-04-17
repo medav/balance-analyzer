@@ -8,6 +8,9 @@ class DataflowNode:
         self.targets = []
         self.num_sources = 0
 
+    def IsReachable(self, target):
+        raise NotImplementedError()
+
     def Name(self):
         return 'bb{}_i{}'.format(self.bb_id, self.inst_id)
 
@@ -38,6 +41,40 @@ class ControlNode(DataflowNode):
     def __init__(self, bb_id, inst_id, target_bbs):
         super().__init__(bb_id, inst_id)
         self.target_bbs = target_bbs
+
+    def IsConditional(self):
+        # A conditional is identified by any control node with 1 source and two
+        # targets. This should theoretically suffice for capturing any if
+        # expression in C
+        return self.num_sources == 1 and len(self.targets) == 2
+
+    def GetCondExit(self):
+        assert self.IsConditional()
+        raise NotImplementedError()
+
+    def GetTrueBranch(self):
+        assert self.IsConditional()
+        return self.targets[0]
+
+    def GetFalseBranch(self):
+        assert self.IsConditional()
+        return self.targets[1]
+
+    def IsLoopEntry(self):
+        # A loop entry will be a control node with 2 sources and 2 targets.
+        # In addition, one of the targets must be able to reach this node.
+        return \
+            self.num_sources == 2 and
+            len(self.targets) == 2 and
+            (self.targets[0].IsReachable(self) or
+                self.targets[1].IsReachable(self))
+
+    def GetLoopBody(self):
+        assert self.IsLoopEntry()
+        if self.targets[0].IsReachable(self):
+            return self.targets[0]
+        else:
+            return self.targets[1]
 
     def TypeName(self):
         return 'Ctrl'

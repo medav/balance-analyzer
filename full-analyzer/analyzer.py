@@ -4,6 +4,9 @@ from model import *
 class Analyzer():
     def __init__(self, filename):
         self.filename = filename
+        self.loop_trip_counts = {}
+        self.cond_trip_counts = {}
+        self.constraints = []
         self.nodes = self.BuildGraph(filename)
         self.entry = self.nodes[0]
         self.exit = self.FindExit()
@@ -17,11 +20,39 @@ class Analyzer():
             if type(n) is ControlNode and len(n.targets) == 0:
                 return n
 
-    def RemoveLoops(self):
-        # 1. Remove useless ControlNodes
-        # 2. Collapse PortNodes
-        # 3. Loop ellison / trip count insertion
-        pass
+    def PostProcess(self, entry, stop_before):
+        """ Post Process the CFG
+
+        This is operates recursively, almost like a post-order tree traversal.
+        While the CFG is potentially / likely a cyclic graph, this routine will
+        break cycles along the way and turn this into a straight line graph
+        (potentially with conditional branches which reconverge).
+        """
+
+        if entry == stop_before:
+            return
+
+        if type(n) is ControlNode and n.IsLoopEntry():
+            tc = Int('loop_{}'.format(n.Name()))
+            self.loop_trip_counts[n] = tc
+            loop_body = n.GetLoopBody()
+            self.PostProcess(loop_body)
+            self.ApplyTripCount(loop_body, tc, n)
+
+        elif type(n) is ControlNode and n.IsConditional():
+            tc = Int('cond_{}'.format(n.Name()))
+            self.cond_trip_counts[n] = tc
+            cond_exit = n.GetCondExit()
+            true_branch = n.GetTrueBranch()
+            false_branch = n.GetFalseBranch()
+            self.PostProcess(true_branch, cond_exit)
+            self.PostProcess(false_branch, cond_exit)
+            self.ApplyTripCount(true_branch, tc, cond_exit)
+            self.ApplyTripCount(false_branch, tc, cond_exit)
+
+        else:
+            assert len(entry.targets) == 1
+            self.PostProcess(entry.targets[0], stop_before)
 
     def DumpDot(self, f):
         print('digraph G {', file=f)
