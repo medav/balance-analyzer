@@ -12,9 +12,6 @@ class Analyzer():
         self.nodes = self.BuildGraph(filename)
         self.entry = self.nodes[0]
         self.exit = self.FindExit()
-        # self.wait = self.FindWait()
-        # self.RemoveLoops()
-        # self.ComputeDataflow()
 
     def FindExit(self):
         # The exit node is the only control node with no targets
@@ -23,7 +20,21 @@ class Analyzer():
                 return n
 
     def ApplyTripCount(self, entry, tc, stop_before):
-        pass
+        seen = set()
+        work_list = [entry]
+
+        while len(work_list) > 0:
+            n = work_list.pop(0)
+            seen.add(n)
+            n.trip_count = tc * n.trip_count
+
+            if n is stop_before:
+                continue
+
+            for t in n.targets:
+                if t not in seen:
+                    work_list.append(t)
+
 
     def PostProcess(self, entry=None, stop_before=None):
         """ Post Process the CFG
@@ -66,15 +77,16 @@ class Analyzer():
 
         elif type(entry) is ControlNode and entry.IsConditional():
             print('Conditional found at {}'.format(entry.Name()))
-            tc = Int('cond_{}'.format(entry.Name()))
-            self.cond_trip_counts[entry] = tc
+            tc_t = Int('cond_{}_t'.format(entry.Name()))
+            tc_f = Int('cond_{}_f'.format(entry.Name()))
+            self.cond_trip_counts[entry] = (entry, tc_t, tc_f)
             cond_exit = entry.GetCondExit()
             true_branch = entry.GetTrueBranch()
             false_branch = entry.GetFalseBranch()
             self.PostProcess(true_branch, cond_exit)
             self.PostProcess(false_branch, cond_exit)
-            self.ApplyTripCount(true_branch, tc, cond_exit)
-            self.ApplyTripCount(false_branch, tc, cond_exit)
+            self.ApplyTripCount(true_branch, tc_t, cond_exit)
+            self.ApplyTripCount(false_branch, tc_f, cond_exit)
             self.PostProcess(cond_exit, stop_before)
 
         else:
@@ -90,7 +102,7 @@ class Analyzer():
     def DumpDot(self, f):
         print('digraph G {', file=f)
         for n in self.nodes:
-            print('\t{} [label = "{}"];'.format(n.Name(), n.TypeName()))
+            print('\t{} [label = "{}"];'.format(n.Name(), n.Name()))
             for t in n.targets:
                 print(
                     '\t{} -> {};'.format(n.Name(), t.Name()),
@@ -198,4 +210,6 @@ class Analyzer():
 
         return nodes
 
+    def CollectDataflow(self, node):
+        pass
 

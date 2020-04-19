@@ -1,10 +1,9 @@
 
-
 class DataflowNode:
-    def __init__(self, bb_id, inst_id, trip_count=1):
+    def __init__(self, bb_id, inst_id):
         self.bb_id = bb_id
         self.inst_id = inst_id
-        self.trip_count = trip_count
+        self.trip_count = 1
         self.targets = []
         self.sources = []
 
