@@ -19,8 +19,8 @@ int main() {
     const int C = 4;
 
     // Note: These are "dynamic" (I.e. runtime determined)
-    int ni = 100; // # of input neurons
-    int nn = 100; // # of output neurons
+    const int ni = 100; // # of input neurons
+    const int nn = 100; // # of output neurons
 
     uint64_t in[ni];
     uint64_t weights[nn][ni];

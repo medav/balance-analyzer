@@ -55,7 +55,6 @@ class Analyzer():
             return
 
         if type(entry) is ControlNode and entry.IsLoopEntry():
-            print('Loop found at {}'.format(entry.Name()))
             tc = Int('loop_{}'.format(entry.Name()))
             self.loop_trip_counts[entry] = tc
 
@@ -72,22 +71,44 @@ class Analyzer():
             self.PostProcess(loop_exit, stop_before)
 
             # Finally, unlink the loop.
-            reentry.targets = [entry.GetLoopExit()]
+            reentry.targets = [loop_exit]
+            loop_exit.sources = [reentry]
             entry.targets = [loop_body]
+            loop_body.sources = [entry]
+            entry.sources.remove(reentry)
 
         elif type(entry) is ControlNode and entry.IsConditional():
-            print('Conditional found at {}'.format(entry.Name()))
             tc_t = Int('cond_{}_t'.format(entry.Name()))
             tc_f = Int('cond_{}_f'.format(entry.Name()))
+
+            # Record the branch trip counts. This table is used to generate
+            # logic constraints when performing model checking
             self.cond_trip_counts[entry] = (entry, tc_t, tc_f)
+
             cond_exit = entry.GetCondExit()
             true_branch = entry.GetTrueBranch()
             false_branch = entry.GetFalseBranch()
+
             self.PostProcess(true_branch, cond_exit)
             self.PostProcess(false_branch, cond_exit)
+
+            # Apply the trip counts to the two branches
             self.ApplyTripCount(true_branch, tc_t, cond_exit)
             self.ApplyTripCount(false_branch, tc_f, cond_exit)
+
+            # Post process the rest of the graph
             self.PostProcess(cond_exit, stop_before)
+
+            # Re-link the branches to be in-line
+            pred = cond_exit.sources[0]
+            if true_branch.IsReachable(pred):
+                entry.targets.remove(false_branch)
+                pred.targets = [false_branch]
+                false_branch.sources = [pred]
+            else:
+                entry.targets.remove(true_branch)
+                pred.targets = [true_branch]
+                true_branch.sources = [pred]
 
         else:
             #assert len(entry.targets) == 1, 'Not a conditional or loop?'
@@ -112,7 +133,7 @@ class Analyzer():
 
     @staticmethod
     def ComputeSymbolicNumElems(num_iters, stride=None, access_size=None):
-        return 1
+        return num_iters
 
     @staticmethod
     def BuildNode(line):
@@ -205,11 +226,27 @@ class Analyzer():
         for bb_id in range(num_bbs):
             cn = exit_points[bb_id]
             for target_id in cn.target_bbs:
+                if target_id == bb_id:
+                    continue
+
                 cn.targets.append(entry_points[target_id])
                 entry_points[target_id].sources.append(cn)
 
         return nodes
 
-    def CollectDataflow(self, node):
-        pass
+    def CollectDataflow(self, node, num_ports):
+        if node == self.entry:
+            val =  node.Apply(None, num_ports)
+            return val
 
+        if len(node.sources) != 1:
+            print('name = ', node.Name())
+            print('sources = ', node.sources)
+            print('targets = ', node.targets)
+
+        assert len(node.sources) == 1, \
+            'Node has {} sources! (Should have 1)'.format(len(node.sources))
+
+        s = node.sources[0]
+        val = self.CollectDataflow(s, num_ports)
+        return node.Apply(val, num_ports)

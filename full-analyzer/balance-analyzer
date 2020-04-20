@@ -5,11 +5,33 @@ import sys
 from model import *
 from analyzer import *
 
+def IsSat(statement):
+    s = Solver()
+    s.add(statement)
+    issat = s.check() == sat
+    if issat:
+        return True, s.model()
+    else:
+        return False, None
+
+def IsValid(statement):
+    issat, model = IsSat(Not(statement))
+    return not issat, model
+
 a = Analyzer(sys.argv[1])
-
-a.DumpDot(sys.stdout)
 a.PostProcess()
-a.DumpDot(sys.stdout)
 
-for n in a.nodes:
-    print(n.Name(), n.trip_count)
+val = a.CollectDataflow(a.exit, 4)
+
+valid_cond = And(*[
+    val[i] == val[i + 1]
+    for i in range(len(val) - 1)
+])
+
+valid, model = IsValid(valid_cond)
+
+if valid:
+    print('Always Balanced!')
+else:
+    print('Could be unbalanced!')
+    print(model)

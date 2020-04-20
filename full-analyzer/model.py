@@ -30,6 +30,9 @@ class DataflowNode:
     def __repr__(self):
         return self.Name()
 
+    def Apply(self, val, num_ports):
+        return val
+
 class PortNode(DataflowNode):
     def __init__(self, bb_id, inst_id, port, num_elem):
         super().__init__(bb_id, inst_id)
@@ -39,12 +42,19 @@ class PortNode(DataflowNode):
     def TypeName(self):
         return 'StreamCmd'
 
+    def Apply(self, val, num_ports):
+        val[self.port - 1] += self.trip_count * self.num_elem
+        return val
+
 class ConfigNode(DataflowNode):
     def __init__(self, bb_id, inst_id):
         super().__init__(bb_id, inst_id)
 
     def TypeName(self):
         return 'Config'
+
+    def Apply(self, val, num_ports):
+        return [0 for _ in range(num_ports)]
 
 class WaitNode(DataflowNode):
     def __init__(self, bb_id, inst_id):
