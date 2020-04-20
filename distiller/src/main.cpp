@@ -79,8 +79,8 @@ void ProcessCall(int bb_id, int inst_id, llvm::CallSite& cs) {
 
     if (func == SB_CONFIG) {
         out_file << bb_id << "," << inst_id << ","
-            << "SB_CONFIG("
-            << ")" << std::endl;
+            << "SB_CONFIG"
+            << std::endl;
     }
     else if (func == SB_MEM_PORT_STREAM) {
         out_file << bb_id << "," << inst_id << ","
