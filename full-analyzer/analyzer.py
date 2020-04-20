@@ -134,7 +134,7 @@ class Analyzer():
 
     @staticmethod
     def ComputeSymbolicNumElems(num_iters, stride=None, access_size=None):
-        return num_iters
+        return int(num_iters)
 
     @staticmethod
     def BuildNode(line):
