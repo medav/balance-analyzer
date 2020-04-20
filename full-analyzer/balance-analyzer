@@ -29,9 +29,13 @@ valid_cond = And(*[
 ])
 
 valid, model = IsValid(valid_cond)
+never_valid, _ = IsValid(Not(valid_cond))
 
 if valid:
     print('Always Balanced!')
 else:
-    print('Could be unbalanced!')
-    print(model)
+    if never_valid:
+        print('Never Balanced!')
+    else:
+        print('Could be unbalanced!')
+        print(model)
