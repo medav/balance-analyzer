@@ -101,6 +101,7 @@ class Analyzer():
 
             # Re-link the branches to be in-line
             pred = cond_exit.sources[0]
+            cond_exit.sources.remove(pred)
             if true_branch.IsReachable(pred):
                 entry.targets.remove(false_branch)
                 pred.targets = [false_branch]
