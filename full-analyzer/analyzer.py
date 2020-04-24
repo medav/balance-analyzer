@@ -124,7 +124,7 @@ class Analyzer():
     def DumpDot(self, f):
         print('digraph G {', file=f)
         for n in self.nodes:
-            print('\t{} [label = "{}"];'.format(n.Name(), n.Name()))
+            print('\t{} [label = "{}"];'.format(n.Name(), n.Name()), file=f)
             for t in n.targets:
                 print(
                     '\t{} -> {};'.format(n.Name(), t.Name()),
