@@ -1,4 +1,5 @@
 .vscode
 *.ll
 __pycache__
-
+*.df
+*.dot
