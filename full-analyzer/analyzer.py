@@ -54,6 +54,12 @@ class Analyzer():
         if entry == stop_before:
             return
 
+        # In cases where we are processing a loop, the reentry node will have
+        # its target links removed to force processing to terminate. This will
+        # result in len(targets) == 0
+        if len(entry.targets) == 0:
+            return
+
         if type(entry) is ControlNode and entry.IsLoopEntry():
             tc = Int('loop_{}'.format(entry.Name()))
             self.loop_trip_counts[entry] = tc
@@ -61,6 +67,11 @@ class Analyzer():
             loop_body = entry.GetLoopBody()
             loop_exit = entry.GetLoopExit()
             reentry = entry.GetLoopReentry()
+
+            # Temporarily set the reentry to have no targets. This ensures the
+            # recursive call doesn't accidentally jump out and cause weird
+            # things to happen to the CFG.
+            reentry.targets = []
 
             # Before anything else, we post process the loop body. This is the
             # "pre-order" part of this traversal.
