@@ -49,10 +49,6 @@ int main() {
             SB_DISCARD(C, ni - 1);
             SB_PORT_MEM_STREAM(C, WORD_SIZE, WORD_SIZE, 1, &out[b][n]);
         }
-
-        if (some_condition) {
-            SB_MEM_PORT_STREAM(in[0], WORD_SIZE, WORD_SIZE, ni, A);
-        }
     }
 
     SB_WAIT();
