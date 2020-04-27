@@ -19,7 +19,14 @@ def IsValid(statement):
     return not issat, model
 
 a = Analyzer(sys.argv[1])
+
+with open('before.dot', 'w') as f:
+    a.DumpDot(f)
+
 a.PostProcess()
+
+with open('after.dot', 'w') as f:
+    a.DumpDot(f)
 
 val = a.CollectDataflow(a.exit, 4)
 
