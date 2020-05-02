@@ -3,15 +3,33 @@ from z3 import *
 
 from model import *
 
+import os
+import subprocess
+
+def CompileDot(dotfile, outdir='edits'):
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    subprocess.check_output([
+        'dot',
+        '-Tpng',
+        dotfile,
+        '-o',
+        '{}/{}'.format(outdir, dotfile.replace('.dot', '.png'))
+    ])
+
 class Analyzer():
     def __init__(self, filename):
         self.filename = filename
         self.loop_trip_counts = {}
-        self.cond_trip_counts = {}
+        self.cond_trip_counts = []
         self.constraints = []
         self.nodes = self.BuildGraph(filename)
         self.entry = self.nodes[0]
         self.exit = self.FindExit()
+        self.edit = 0
+        self.indent = 0
+        self.debug = False
 
     def FindExit(self):
         # The exit node is the only control node with no targets
@@ -19,22 +37,57 @@ class Analyzer():
             if type(n) is ControlNode and len(n.targets) == 0:
                 return n
 
+    def CreateTripCount(self, tc_name):
+        tc = Int(tc_name)
+        self.constraints.append(tc >= 0)
+        return tc
+
     def ApplyTripCount(self, entry, tc, stop_before):
         seen = set()
         work_list = [entry]
 
         while len(work_list) > 0:
             n = work_list.pop(0)
-            seen.add(n)
-            n.trip_count = tc * n.trip_count
 
             if n is stop_before:
                 continue
 
+            seen.add(n)
+            n.trip_count = tc * n.trip_count
+
             for t in n.targets:
-                if t not in seen:
+                if t not in seen and t is not stop_before:
                     work_list.append(t)
 
+    def GenConstraints(self):
+        cs = self.constraints + [
+            tb.trip_count + fb.trip_count == c.trip_count
+            for (c, tb, fb) in self.cond_trip_counts
+        ]
+
+        return And(*cs)
+
+    def NewEditFile(self, node):
+        filename = 'edit{}-{}.dot'.format(self.edit, node.Name())
+        self.edit += 1
+        return filename
+
+    def DumpEditDot(self, node):
+        if not self.debug:
+            return
+
+        dotfile = self.NewEditFile(node)
+        with open(dotfile, 'w') as f:
+            self.DumpDot(f)
+
+        self.Debug('Capturing Edit! File = {}'.format(dotfile))
+        CompileDot(dotfile)
+
+    def Debug(self, msg):
+        if not self.debug:
+            return
+
+        print(' |  '*self.indent, msg)
 
     def PostProcess(self, entry=None, stop_before=None):
         """ Post Process the CFG
@@ -54,19 +107,31 @@ class Analyzer():
         if entry == stop_before:
             return
 
+        self.Debug('PostProcess({}) {{'.format(entry.Name()))
+        self.indent += 1
+
         # In cases where we are processing a loop, the reentry node will have
         # its target links removed to force processing to terminate. This will
         # result in len(targets) == 0
         if len(entry.targets) == 0:
+            self.indent -= 1
+            self.Debug('}')
             return
 
+
         if type(entry) is ControlNode and entry.IsLoopEntry():
-            tc = Int('loop_{}'.format(entry.Name()))
+            tc = self.CreateTripCount('loop_{}'.format(entry.Name()))
             self.loop_trip_counts[entry] = tc
+
+            self.Debug('Processing loop')
 
             loop_body = entry.GetLoopBody()
             loop_exit = entry.GetLoopExit()
             reentry = entry.GetLoopReentry()
+
+            self.Debug('Body: {}'.format(loop_body.Name()))
+            self.Debug('Exit: {}'.format(loop_exit.Name()))
+            self.Debug('Re-Entry: {}'.format(reentry.Name()))
 
             # Temporarily set the reentry to have no targets. This ensures the
             # recursive call doesn't accidentally jump out and cause weird
@@ -75,11 +140,9 @@ class Analyzer():
 
             # Before anything else, we post process the loop body. This is the
             # "pre-order" part of this traversal.
+            self.Debug('Loop Body')
             self.PostProcess(loop_body, entry)
             self.ApplyTripCount(loop_body, tc, entry)
-
-            # Now Post Process the rest of the graph starting at the loop exit.
-            self.PostProcess(loop_exit, stop_before)
 
             # Finally, unlink the loop.
             reentry.targets = [loop_exit]
@@ -88,19 +151,40 @@ class Analyzer():
             loop_body.sources = [entry]
             entry.sources.remove(reentry)
 
-        elif type(entry) is ControlNode and entry.IsConditional():
-            tc_t = Int('cond_{}_t'.format(entry.Name()))
-            tc_f = Int('cond_{}_f'.format(entry.Name()))
+            self.DumpEditDot(entry)
 
-            # Record the branch trip counts. This table is used to generate
-            # logic constraints when performing model checking
-            self.cond_trip_counts[entry] = (entry, tc_t, tc_f)
+            # Now Post Process the rest of the graph starting at the loop exit.
+            self.PostProcess(loop_exit, stop_before)
+
+        elif type(entry) is ControlNode and entry.IsConditional():
+            tc_t = self.CreateTripCount('cond_{}_t'.format(entry.Name()))
+            tc_f = self.CreateTripCount('cond_{}_f'.format(entry.Name()))
+
+            self.Debug('Processing Conditional')
 
             cond_exit = entry.GetCondExit()
             true_branch = entry.GetTrueBranch()
             false_branch = entry.GetFalseBranch()
 
+            self.Debug('True Branch: {}'.format(true_branch.Name()))
+            self.Debug('False Branch: {}'.format(false_branch.Name()))
+            self.Debug('Exit: {}'.format(cond_exit.Name()))
+
+            if false_branch is cond_exit:
+                false_branch = DummyNode(entry, cond_exit)
+                self.nodes.append(false_branch)
+
+            if true_branch is cond_exit:
+                true_branch = DummyNode(entry, cond_exit)
+                self.nodes.append(true_branch)
+
+            # Record the branch trip counts. This table is used to generate
+            # logic constraints when performing model checking
+            self.cond_trip_counts.append((entry, true_branch, false_branch))
+
+            self.Debug('True Branch')
             self.PostProcess(true_branch, cond_exit)
+            self.Debug('False Branch')
             self.PostProcess(false_branch, cond_exit)
 
             # Apply the trip counts to the two branches
@@ -119,6 +203,8 @@ class Analyzer():
                 pred.targets = [true_branch]
                 true_branch.sources = [pred]
 
+            self.DumpEditDot(entry)
+
             # Post process the rest of the graph
             self.PostProcess(cond_exit, stop_before)
 
@@ -131,6 +217,9 @@ class Analyzer():
                 print('targets = ', entry.targets)
                 raise RuntimeError('Not a conditional or loop?')
             self.PostProcess(entry.targets[0], stop_before)
+
+        self.indent -= 1
+        self.Debug('}')
 
     def DumpDot(self, f):
         print('digraph G {', file=f)

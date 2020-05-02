@@ -22,27 +22,42 @@ a = Analyzer(sys.argv[1])
 
 with open('before.dot', 'w') as f:
     a.DumpDot(f)
+CompileDot('before.dot')
 
 a.PostProcess()
 
 with open('after.dot', 'w') as f:
     a.DumpDot(f)
+CompileDot('after.dot')
 
-val = a.CollectDataflow(a.exit, 4)
+val = a.CollectDataflow(a.exit, int(sys.argv[2]))
 
-valid_cond = And(*[
+print('Symbolic dataflow value:')
+for i in range(len(val)):
+    print(' {} :'.format(i), val[i])
+
+balance_cond = And(*[
     val[i] == val[i + 1]
     for i in range(len(val) - 1)
 ])
 
-valid, model = IsValid(valid_cond)
-never_valid, _ = IsValid(Not(valid_cond))
+query = Implies(a.GenConstraints(), balance_cond)
 
-if valid:
+print('==== Query ====')
+print(query)
+print('===============')
+
+bal, unbal_model = IsValid(Implies(a.GenConstraints(), balance_cond))
+unbal, bal_model = IsValid(Implies(a.GenConstraints(), Not(balance_cond)))
+
+if bal:
     print('Always Balanced!')
+elif unbal:
+    print('Never Balanced!')
 else:
-    if never_valid:
-        print('Never Balanced!')
-    else:
-        print('Could be unbalanced!')
-        print(model)
+    print('Could be unbalanced!')
+    print('==== Unbalanced Model ====')
+    print(unbal_model)
+    print()
+    print('==== Balanced Model ====')
+    print(bal_model)

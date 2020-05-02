@@ -56,6 +56,29 @@ class ConfigNode(DataflowNode):
     def Apply(self, val, num_ports):
         return [0 for _ in range(num_ports)]
 
+class DummyNode(DataflowNode):
+    def __init__(self, pred, succ):
+        super().__init__(pred.bb_id, -1)
+        self.sources = [pred]
+        self.targets = [succ]
+
+        assert succ in pred.targets
+        assert pred in succ.sources
+
+        pred.targets.remove(succ)
+        pred.targets.append(self)
+
+        succ.sources.remove(pred)
+        succ.sources.append(self)
+
+        self.name = pred.Name() + '_' + succ.Name()
+
+    def TypeName(self):
+        return 'Dummy'
+
+    def Name(self):
+        return self.name
+
 class WaitNode(DataflowNode):
     def __init__(self, bb_id, inst_id):
         super().__init__(bb_id, inst_id)
@@ -80,20 +103,32 @@ class ControlNode(DataflowNode):
         tb = self.GetTrueBranch()
         fb = self.GetFalseBranch()
 
-        seen = set()
-        work_list = [tb, fb]
+        seen_t = set()
+        seen_f = set()
+        wl_t = [tb]
+        wl_f = [fb]
 
-        while len(work_list) > 0:
-            n = work_list.pop(0)
+        seen = [seen_t, seen_f]
+        wls = [wl_t, wl_f]
+        i = 0
 
-            if n in seen:
-                return n
+        while len(wl_t) > 0 or len(wl_f) > 0:
+            if len(wls[i % 2]) > 0:
+                n = wls[i % 2].pop(0)
 
-            for t in n.targets:
-                if n not in seen:
-                    work_list.append(t)
+                intersection = seen_t.intersection(seen_f)
+                if len(intersection) > 0:
+                    assert len(intersection) == 1
+                    return list(intersection)[0]
 
-            seen.add(n)
+                for t in n.targets:
+                    if n not in seen:
+                        wls[i % 2].append(t)
+
+
+                seen[i % 2].add(n)
+
+            i += 1
 
         raise RuntimeError('Could not find If-Condition Exit!')
 
