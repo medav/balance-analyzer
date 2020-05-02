@@ -145,6 +145,8 @@ class Analyzer():
 
     @staticmethod
     def ComputeSymbolicNumElems(num_iters, stride=None, access_size=None):
+        if access_size is not None:
+            return int(num_iters) * int(access_size) // 8
         return int(num_iters)
 
     @staticmethod
