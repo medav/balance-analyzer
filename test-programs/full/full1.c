@@ -31,7 +31,6 @@ int main() {
     SB_CONFIG();
 
     for (int n = 0; n < nn; n++) {
-        SB_MEM_PORT_STREAM(in, WORD_SIZE, WORD_SIZE, ni, A);
         SB_MEM_PORT_STREAM(weights[n], WORD_SIZE, WORD_SIZE, ni, B);
 
         // The reset port should get all zeros except for the last one. On the

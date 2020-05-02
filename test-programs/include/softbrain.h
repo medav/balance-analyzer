@@ -43,3 +43,13 @@ void SB_MEM_SCRATCH_STREAM(
 #define SBBAR_SCRATCH_WRITE 0
 #define SBBAR_SCRATCH_READ 1
 void SB_BARRIER(int type) { }
+
+#define SB_PORT_MEM_BYTES(port, bytes, addr) \
+    SB_PORT_MEM_STREAM(port, 0, bytes, 1, addr)
+
+#define SB_RECURRENCE(outport, inport, nelem) \
+    SB_DISCARD(outport, nelem); \
+    SB_CONSTANT(inport, 0, nelem); \
+
+#define DEFINE_PRX_KERNEL(name, argt, arg) \
+    int main()

@@ -33,6 +33,12 @@ int main() {
 
     SB_CONFIG();
 
+    // SB_MEM_PORT_STREAM(in[0], WORD_SIZE, WORD_SIZE, ni, A);
+
+    if (some_condition) {
+        SB_MEM_PORT_STREAM(in[0], WORD_SIZE, WORD_SIZE, ni, A);
+    }
+
     for (int b = 0; b < BS; b++) {
         for (int n = 0; n < nn; n++) {
             SB_MEM_PORT_STREAM(in[b], WORD_SIZE, WORD_SIZE, ni, A);
