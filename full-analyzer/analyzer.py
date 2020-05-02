@@ -107,9 +107,6 @@ class Analyzer():
             self.ApplyTripCount(true_branch, tc_t, cond_exit)
             self.ApplyTripCount(false_branch, tc_f, cond_exit)
 
-            # Post process the rest of the graph
-            self.PostProcess(cond_exit, stop_before)
-
             # Re-link the branches to be in-line
             pred = cond_exit.sources[0]
             cond_exit.sources.remove(pred)
@@ -121,6 +118,9 @@ class Analyzer():
                 entry.targets.remove(true_branch)
                 pred.targets = [true_branch]
                 true_branch.sources = [pred]
+
+            # Post process the rest of the graph
+            self.PostProcess(cond_exit, stop_before)
 
         else:
             #assert len(entry.targets) == 1, 'Not a conditional or loop?'
